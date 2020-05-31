@@ -1,6 +1,7 @@
 ﻿using System;
 using Avalonia.Controls;
-
+using OpenCvSharp;
+using OpenCvSharp.Extensions;
 using ReactiveUI;
 using SQRLDotNetClientUI.Views;
 using SQRLUtilsLib;
