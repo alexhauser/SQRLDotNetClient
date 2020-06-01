@@ -22,7 +22,6 @@
     <StackPanel IsVisible="{Binding ShowQrImport}" DockPanel.Dock="Top" Orientation="Vertical">
       <TextBlock Text="{loc:Localization ImportQrCodeMessage}" Margin="0,0,0,10" FontSize="12" TextWrapping="Wrap"/>
       <Image Source="{Binding CameraFrame}" Width="400" Height="300" Margin="0,0,0,10" Stretch="UniformToFill" HorizontalAlignment="Center" />
-      <Button Content="{loc:Localization BtnBack}" Command="{Binding ToggleQrImport}" CommandParameter="false" HorizontalAlignment="Center" Height="25" />
     </StackPanel>
 
     <DockPanel DockPanel.Dock="Bottom">
