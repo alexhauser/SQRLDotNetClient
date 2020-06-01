@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Media.Imaging;
@@ -7,6 +8,7 @@ using Avalonia.Threading;
 using OpenCvSharp;
 using OpenCvSharp.Extensions;
 using ReactiveUI;
+using Serilog;
 using SQRLDotNetClientUI.Views;
 using SQRLUtilsLib;
 
@@ -17,6 +19,8 @@ namespace SQRLDotNetClientUI.ViewModels
         private string _textualIdentity = "";
         private bool _showQrImport = false;
         private Bitmap _cameraFrame = null;
+        private CancellationTokenSource _cts;
+        private CancellationToken _token;
 
         /// <summary>
         /// Gets or sets a value indicating whether or not to display the
@@ -28,7 +32,16 @@ namespace SQRLDotNetClientUI.ViewModels
             set 
             { 
                 this.RaiseAndSetIfChanged(ref _showQrImport, value);
-                if (value) ImportQrCode();
+                if (value)
+                {
+                    _cts = new CancellationTokenSource();
+                    _token = _cts.Token;
+                    ImportQrCode();
+                }
+                else
+                {
+                    _cts.Cancel();
+                }
             }
         }
 
@@ -108,6 +121,7 @@ namespace SQRLDotNetClientUI.ViewModels
 
         public async void ImportQrCode()
         {
+            Log.Information("QR-code scan initiated");
 
             await Task.Run(() =>
             {
@@ -119,30 +133,40 @@ namespace SQRLDotNetClientUI.ViewModels
                     // TODO: Error!
                 }
 
-                for (int i = 0; i < 1000; i++)
+                while (true)
                 {
                     using (var frameMat = capture.RetrieveMat())
                     {
                         if (frameMat.Empty()) continue;
 
-                        var stream = new MemoryStream();
-                        BitmapConverter.ToBitmap(frameMat).Save(stream, System.Drawing.Imaging.ImageFormat.Bmp);
+                        MemoryStream stream = frameMat.ToMemoryStream();
                         stream.Seek(0, SeekOrigin.Begin);
                         Bitmap frame = new Bitmap(stream);
 
                         Dispatcher.UIThread.Post(() =>
                             this.CameraFrame = frame
                         );
+
+                        if (_token.IsCancellationRequested)
+                        {
+                            Log.Information("QR-code scan was cancelled");
+                            break;
+                        }
                     }
                 }
 
                 capture.Dispose();
-            });
+            }, _token);
             
         }
 
         public void Cancel()
         {
+            if (!_cts.IsCancellationRequested)
+            {
+                _cts.Cancel();
+            }
+
             ((MainWindowViewModel)_mainWindow.DataContext).Content = 
                 ((MainWindowViewModel)_mainWindow.DataContext).PriorContent;
         }
