@@ -1,5 +1,9 @@
 ﻿using System;
+using System.IO;
+using System.Threading.Tasks;
 using Avalonia.Controls;
+using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using OpenCvSharp;
 using OpenCvSharp.Extensions;
 using ReactiveUI;
@@ -11,6 +15,32 @@ namespace SQRLDotNetClientUI.ViewModels
     public class ImportIdentityViewModel: ViewModelBase
     {       
         private string _textualIdentity = "";
+        private bool _showQrImport = false;
+        private Bitmap _cameraFrame = null;
+
+        /// <summary>
+        /// Gets or sets a value indicating whether or not to display the
+        /// "import qr-code" UI.
+        /// </summary>
+        public bool ShowQrImport
+        {
+            get { return _showQrImport; }
+            set 
+            { 
+                this.RaiseAndSetIfChanged(ref _showQrImport, value);
+                if (value) ImportQrCode();
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the current frame from the webcam.
+        /// </summary>
+        Bitmap CameraFrame
+        {
+            get { return _cameraFrame; }
+            set { this.RaiseAndSetIfChanged(ref _cameraFrame, value); }
+        }
+
         public string TextualIdentity 
         { 
             get => _textualIdentity; 
@@ -64,6 +94,51 @@ namespace SQRLDotNetClientUI.ViewModels
             {
                 this.IdentityFile = files[0];
             }
+        }
+
+        /// <summary>
+        /// Toggles the visibility of the qr code UI.
+        /// </summary>
+        /// <param name="visible">Set to <c>true</c> to show the qr code, 
+        /// or <c>false</c> to hide it</param>
+        public void ToggleQrImport(bool visible)
+        {
+            this.ShowQrImport = visible;
+        }
+
+        public async void ImportQrCode()
+        {
+
+            await Task.Run(() =>
+            {
+                VideoCapture capture = new VideoCapture();
+                capture.Open(0, VideoCaptureAPIs.ANY);
+
+                if (!capture.IsOpened())
+                {
+                    // TODO: Error!
+                }
+
+                for (int i = 0; i < 1000; i++)
+                {
+                    using (var frameMat = capture.RetrieveMat())
+                    {
+                        if (frameMat.Empty()) continue;
+
+                        var stream = new MemoryStream();
+                        BitmapConverter.ToBitmap(frameMat).Save(stream, System.Drawing.Imaging.ImageFormat.Bmp);
+                        stream.Seek(0, SeekOrigin.Begin);
+                        Bitmap frame = new Bitmap(stream);
+
+                        Dispatcher.UIThread.Post(() =>
+                            this.CameraFrame = frame
+                        );
+                    }
+                }
+
+                capture.Dispose();
+            });
+            
         }
 
         public void Cancel()
