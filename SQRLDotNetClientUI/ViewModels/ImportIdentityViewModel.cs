@@ -7,6 +7,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using OpenCvSharp;
 using OpenCvSharp.Extensions;
+using QRCodeDecoderLibrary;
 using ReactiveUI;
 using Serilog;
 using SQRLDotNetClientUI.Views;
@@ -21,6 +22,7 @@ namespace SQRLDotNetClientUI.ViewModels
         private Bitmap _cameraFrame = null;
         private CancellationTokenSource _cts;
         private CancellationToken _token;
+        private byte[] _identityDataFromQrCode = null;
 
         /// <summary>
         /// Gets or sets a value indicating whether or not to display the
@@ -107,6 +109,8 @@ namespace SQRLDotNetClientUI.ViewModels
             {
                 this.IdentityFile = files[0];
             }
+
+            ImportVerify();
         }
 
         /// <summary>
@@ -137,21 +141,41 @@ namespace SQRLDotNetClientUI.ViewModels
                 {
                     using (var frameMat = capture.RetrieveMat())
                     {
-                        if (frameMat.Empty()) continue;
-
-                        MemoryStream stream = frameMat.ToMemoryStream();
-                        stream.Seek(0, SeekOrigin.Begin);
-                        Bitmap frame = new Bitmap(stream);
-
-                        Dispatcher.UIThread.Post(() =>
-                            this.CameraFrame = frame
-                        );
-
+                        // Check for cancellation
                         if (_token.IsCancellationRequested)
                         {
                             Log.Information("QR-code scan was cancelled");
                             break;
                         }
+
+                        // If we get no video frame, just try again
+                        if (frameMat.Empty()) continue;
+
+                        // Display the video frame in the UI
+                        using (MemoryStream stream = frameMat.ToMemoryStream())
+                        {
+                            stream.Seek(0, SeekOrigin.Begin);
+                            Bitmap frame = new Bitmap(stream);
+
+                            Dispatcher.UIThread.Post(() =>
+                                this.CameraFrame = frame
+                            );
+                        }
+
+                        // Try decoding a QR code within the video frame
+                        QRDecoder qrDecoder = new QRDecoder();
+                        byte[][] qrCodes = qrDecoder.ImageDecoder(BitmapConverter.ToBitmap(frameMat));
+
+                        if (qrCodes == null || qrCodes.Length < 1) continue;
+
+                        // Decoding succeeded, verify the imported data
+                        Dispatcher.UIThread.Post(() =>
+                        {
+                            _identityDataFromQrCode = qrCodes[0];
+                            ImportVerify();
+                        });
+                        
+                        break;
                     }
                 }
 
@@ -203,6 +227,23 @@ namespace SQRLDotNetClientUI.ViewModels
                         string.Format(_loc.GetLocalizationValue("FileImportErrorMessage"), ex.Message),
                         MessageBoxSize.Medium, MessageBoxButtons.OK, MessageBoxIcons.ERROR)
                         .ShowDialog(this);
+                }
+            }
+            else if (_identityDataFromQrCode != null)
+            {
+                try
+                {
+                    identity = SQRLIdentity.FromByteArray(_identityDataFromQrCode);
+                }
+                catch (Exception ex)
+                {
+
+                    await new MessageBoxViewModel(_loc.GetLocalizationValue("ErrorTitleGeneric"),
+                        string.Format(_loc.GetLocalizationValue("QrCodeImportErrorMessage"), ex.Message),
+                        MessageBoxSize.Medium, MessageBoxButtons.OK, MessageBoxIcons.ERROR)
+                        .ShowDialog(this);
+
+                    ImportQrCode();
                 }
             }
 
