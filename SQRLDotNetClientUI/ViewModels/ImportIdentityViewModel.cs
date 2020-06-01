@@ -134,7 +134,42 @@ namespace SQRLDotNetClientUI.ViewModels
 
                 if (!capture.IsOpened())
                 {
-                    // TODO: Error!
+                    // Could not find a suitable camera/capture device
+                    // Create an "video frame" containing an error message
+
+                    System.Drawing.Bitmap errorBmp = new System.Drawing.Bitmap(640, 480);
+                    using (var graphics = System.Drawing.Graphics.FromImage(errorBmp))
+                    {
+                        graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighSpeed;
+                        graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                        graphics.FillRectangle(System.Drawing.Brushes.Black, new System.Drawing.Rectangle(0, 0, errorBmp.Width, errorBmp.Height));
+                        System.Drawing.StringFormat sf = new System.Drawing.StringFormat()
+                        {
+                            Alignment = System.Drawing.StringAlignment.Center,
+                            LineAlignment = System.Drawing.StringAlignment.Center
+                        };
+
+                        graphics.DrawString(
+                            @"This is a test let's look how it's being drawn to the image asdfasd sfwefewf wefawef a f!",
+                            new System.Drawing.Font("Arial", 18), 
+                            System.Drawing.Brushes.White,
+                            new System.Drawing.RectangleF(20, 20, errorBmp.Width - 20, errorBmp.Height - 20), 
+                            sf);
+
+                        // Display the error frame in the UI
+                        using (var stream = new MemoryStream())
+                        {
+                            errorBmp.Save(stream, System.Drawing.Imaging.ImageFormat.Bmp);
+                            stream.Seek(0, SeekOrigin.Begin);
+                            Bitmap frame = new Bitmap(stream);
+
+                            Dispatcher.UIThread.Post(() =>
+                                this.CameraFrame = frame
+                            );
+                        }
+                    }
+
+                    return;
                 }
 
                 while (true)
@@ -233,7 +268,8 @@ namespace SQRLDotNetClientUI.ViewModels
             {
                 try
                 {
-                    identity = SQRLIdentity.FromByteArray(_identityDataFromQrCode);
+                    bool noHeader = !SQRLIdentity.HasHeader(_identityDataFromQrCode);
+                    identity = SQRLIdentity.FromByteArray(_identityDataFromQrCode, noHeader);
                 }
                 catch (Exception ex)
                 {
@@ -243,6 +279,7 @@ namespace SQRLDotNetClientUI.ViewModels
                         MessageBoxSize.Medium, MessageBoxButtons.OK, MessageBoxIcons.ERROR)
                         .ShowDialog(this);
 
+                    // Launch camera again to keep trying
                     ImportQrCode();
                 }
             }
