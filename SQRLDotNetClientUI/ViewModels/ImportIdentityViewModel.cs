@@ -15,9 +15,14 @@ using SQRLUtilsLib;
 
 namespace SQRLDotNetClientUI.ViewModels
 {
+    /// <summary>
+    /// A view model representing the "import identity" screen.
+    /// </summary>
     public class ImportIdentityViewModel: ViewModelBase
     {       
         private string _textualIdentity = "";
+        private string _identityFile = "";
+        private bool _canImport = false;
         private bool _showQrImport = false;
         private Bitmap _cameraFrame = null;
         private CancellationTokenSource _cts;
@@ -56,26 +61,36 @@ namespace SQRLDotNetClientUI.ViewModels
             set { this.RaiseAndSetIfChanged(ref _cameraFrame, value); }
         }
 
+        /// <summary>
+        /// Gets or sets a value representing the textual identity.
+        /// </summary>
         public string TextualIdentity 
         { 
             get => _textualIdentity; 
             set { this.RaiseAndSetIfChanged(ref _textualIdentity, value); } 
         }
 
-        private string _identityFile="";
+        /// <summary>
+        /// Gets or sets the path of the user-selected identity file.
+        /// </summary>
         public string IdentityFile 
         {
             get => _identityFile; 
             set { this.RaiseAndSetIfChanged(ref _identityFile, value); } 
         }
 
-        private bool _canImport = false;
+        /// <summary>
+        /// Gets or sets a value indicating whether the "Import" button is enabled. 
+        /// </summary>        
         public bool CanImport
         {
             get => _canImport;
             set { this.RaiseAndSetIfChanged(ref _canImport, value); }
         }
 
+        /// <summary>
+        /// Creates a new instance and initializes things.
+        /// </summary>
         public ImportIdentityViewModel()
         {
             this.Title = _loc.GetLocalizationValue("ImportIdentityWindowTitle");
@@ -87,8 +102,13 @@ namespace SQRLDotNetClientUI.ViewModels
                     if (!string.IsNullOrEmpty(x.Item1) || !string.IsNullOrEmpty(x.Item2)) CanImport = true;
                     else CanImport = false;
                 });
+
+            SetBlackVideoFrame(_loc.GetLocalizationValue("OpeningCameraMessage"));
         }
 
+        /// <summary>
+        /// Displays a file picker dialog for importing an identity file.
+        /// </summary>
         public async void ImportFile()
         {
             FileDialogFilter fdf = new FileDialogFilter();
@@ -123,12 +143,18 @@ namespace SQRLDotNetClientUI.ViewModels
             this.ShowQrImport = visible;
         }
 
+        /// <summary>
+        /// Displays a video feed from the system's default camera and tries detecting 
+        /// SQRL qr codes within the video frames.
+        /// </summary>
         public async void ImportQrCode()
         {
             Log.Information("QR-code scan initiated");
+            SetBlackVideoFrame(_loc.GetLocalizationValue("OpeningCameraMessage"));
 
             await Task.Run(() =>
             {
+                Log.Information("Opening camera device");
                 VideoCapture capture = new VideoCapture();
                 capture.Open(0, VideoCaptureAPIs.ANY);
 
@@ -136,39 +162,8 @@ namespace SQRLDotNetClientUI.ViewModels
                 {
                     // Could not find a suitable camera/capture device
                     // Create an "video frame" containing an error message
-
-                    System.Drawing.Bitmap errorBmp = new System.Drawing.Bitmap(640, 480);
-                    using (var graphics = System.Drawing.Graphics.FromImage(errorBmp))
-                    {
-                        graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighSpeed;
-                        graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-                        graphics.FillRectangle(System.Drawing.Brushes.Black, new System.Drawing.Rectangle(0, 0, errorBmp.Width, errorBmp.Height));
-                        System.Drawing.StringFormat sf = new System.Drawing.StringFormat()
-                        {
-                            Alignment = System.Drawing.StringAlignment.Center,
-                            LineAlignment = System.Drawing.StringAlignment.Center
-                        };
-
-                        graphics.DrawString(
-                            @"This is a test let's look how it's being drawn to the image asdfasd sfwefewf wefawef a f!",
-                            new System.Drawing.Font("Arial", 18), 
-                            System.Drawing.Brushes.White,
-                            new System.Drawing.RectangleF(20, 20, errorBmp.Width - 20, errorBmp.Height - 20), 
-                            sf);
-
-                        // Display the error frame in the UI
-                        using (var stream = new MemoryStream())
-                        {
-                            errorBmp.Save(stream, System.Drawing.Imaging.ImageFormat.Bmp);
-                            stream.Seek(0, SeekOrigin.Begin);
-                            Bitmap frame = new Bitmap(stream);
-
-                            Dispatcher.UIThread.Post(() =>
-                                this.CameraFrame = frame
-                            );
-                        }
-                    }
-
+                    Log.Error("No camera or capture device found, bailing!");
+                    SetBlackVideoFrame(_loc.GetLocalizationValue("NoCameraMessage"));
                     return;
                 }
 
@@ -204,6 +199,7 @@ namespace SQRLDotNetClientUI.ViewModels
                         if (qrCodes == null || qrCodes.Length < 1) continue;
 
                         // Decoding succeeded, verify the imported data
+                        Log.Information("QR code found while decoding, now verifying data");
                         Dispatcher.UIThread.Post(() =>
                         {
                             _identityDataFromQrCode = qrCodes[0];
@@ -214,22 +210,64 @@ namespace SQRLDotNetClientUI.ViewModels
                     }
                 }
 
+                Log.Information("Closing camera / capture device");
                 capture.Dispose();
             }, _token);
-            
         }
 
+        /// <summary>
+        /// Fills the image control with a fake "video frame" with black background and the given <paramref name="text"/>.
+        /// </summary>
+        /// <param name="text">The text to display on the black background.</param>
+        private void SetBlackVideoFrame(string text)
+        {
+            using (System.Drawing.Bitmap errorBmp = new System.Drawing.Bitmap(640, 480))
+            using (var graphics = System.Drawing.Graphics.FromImage(errorBmp))
+            using (var stream = new MemoryStream())
+            {
+                graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighSpeed;
+                graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                graphics.FillRectangle(System.Drawing.Brushes.Black, 
+                    new System.Drawing.Rectangle(0, 0, errorBmp.Width, errorBmp.Height));
+                System.Drawing.StringFormat sf = new System.Drawing.StringFormat()
+                {
+                    Alignment = System.Drawing.StringAlignment.Center,
+                    LineAlignment = System.Drawing.StringAlignment.Center
+                };
+
+                graphics.DrawString(text, new System.Drawing.Font("Arial", 18), System.Drawing.Brushes.White,
+                    new System.Drawing.RectangleF(20, 20, errorBmp.Width - 20, errorBmp.Height - 20), sf);
+
+                // Display the error frame in the UI
+                errorBmp.Save(stream, System.Drawing.Imaging.ImageFormat.Bmp);
+                stream.Seek(0, SeekOrigin.Begin);
+                Bitmap frame = new Bitmap(stream);
+
+                Dispatcher.UIThread.Post(() => this.CameraFrame = frame);
+            }
+        }
+
+        /// <summary>
+        /// Either backs out of the QR code import UI or of the whole import screen.
+        /// </summary>
         public void Cancel()
         {
-            if (!_cts.IsCancellationRequested)
+
+            if (this.ShowQrImport)
             {
-                _cts.Cancel();
+                Log.Information("Backing out of QR code import screen");
+                this.ShowQrImport = false;
+                return;
             }
 
             ((MainWindowViewModel)_mainWindow.DataContext).Content = 
                 ((MainWindowViewModel)_mainWindow.DataContext).PriorContent;
         }
 
+        /// <summary>
+        /// Checks if one of the import methods has delivered import data, and if 
+        /// that check succeeds, tries parsing that data and moves on to the next step.
+        /// </summary>
         public  async void ImportVerify()
         {
             SQRLIdentity identity = null;
