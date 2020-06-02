@@ -23,6 +23,7 @@ namespace SQRLDotNetClientUI.ViewModels
         private string _textualIdentity = "";
         private string _identityFile = "";
         private bool _canImport = false;
+        private bool _canImportQrCode = true;
         private bool _showQrImport = false;
         private Bitmap _cameraFrame = null;
         private CancellationTokenSource _cts;
@@ -53,7 +54,7 @@ namespace SQRLDotNetClientUI.ViewModels
         }
 
         /// <summary>
-        /// Gets or sets the current frame from the webcam.
+        /// Gets or sets the current webcam preview frame.
         /// </summary>
         Bitmap CameraFrame
         {
@@ -89,6 +90,15 @@ namespace SQRLDotNetClientUI.ViewModels
         }
 
         /// <summary>
+        /// Gets or sets a value indicating whether the "Import QR Code" button is enabled. 
+        /// </summary>        
+        public bool CanImportQrCode
+        {
+            get => _canImportQrCode;
+            set { this.RaiseAndSetIfChanged(ref _canImportQrCode, value); }
+        }
+
+        /// <summary>
         /// Creates a new instance and initializes things.
         /// </summary>
         public ImportIdentityViewModel()
@@ -102,8 +112,21 @@ namespace SQRLDotNetClientUI.ViewModels
                     if (!string.IsNullOrEmpty(x.Item1) || !string.IsNullOrEmpty(x.Item2)) CanImport = true;
                     else CanImport = false;
                 });
+            
+            try
+            {
+                SetBlackVideoFrame(_loc.GetLocalizationValue("OpeningCameraMessage"));
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Error creating fake camera frame:\r\n{ex}");
+                this.CanImportQrCode = false;
 
-            SetBlackVideoFrame(_loc.GetLocalizationValue("OpeningCameraMessage"));
+                _ = new MessageBoxViewModel(_loc.GetLocalizationValue("ErrorTitleGeneric"),
+                    _loc.GetLocalizationValue("MissingLibGdiPlusErrorMessage"),
+                    MessageBoxSize.Medium, MessageBoxButtons.OK, MessageBoxIcons.ERROR)
+                    .ShowDialog(this);
+            }
         }
 
         /// <summary>
