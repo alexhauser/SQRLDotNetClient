@@ -119,10 +119,18 @@ namespace SQRLDotNetClientUI.ViewModels
             }
             catch (Exception ex)
             {
-                Log.Error($"Error creating fake camera frame:\r\n{ex}");
+                Log.Error($"Error while creating fake camera frame:\r\n{ex}");
                 this.CanImportQrCode = false;
 
-                ShowLibGdiPlusErrorMsg();
+                // We need to delay the loading of the error message box until
+                // the view model is fully loaded, otherwise it will mess up our
+                // current/previous content model.
+                _ = Task.Run(() =>
+                {
+                    Task.Delay(500);
+                    Log.Information($"Showing libgdiplus error message");
+                    Dispatcher.UIThread.Post(() => ShowLibGdiPlusErrorMsg());
+                });
             }
         }
 
