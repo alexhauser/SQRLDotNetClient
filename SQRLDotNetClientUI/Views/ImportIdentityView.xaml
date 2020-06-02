@@ -16,7 +16,7 @@
       <TextBlock Text="{loc:Localization OrLabel}" Margin="0,0,0,10" FontSize="12"/>
       <Button Name="btnImportFromFile" Content="{loc:Localization BtnImportFile}" Command="{Binding ImportFile}" Margin="0,0,0,10" HorizontalAlignment="Left" Height="25" Width="150" />
       <TextBlock Text="{loc:Localization OrLabel}" Margin="0,0,0,10" FontSize="12"/>
-      <Button Name="btnImportQrCode" IsVisible="{Binding CanImportQrCode}" Content="{loc:Localization BtnImportQrCode}" Command="{Binding ToggleQrImport}" CommandParameter="true" HorizontalAlignment="Left" Height="25" Width="150" />
+      <Button Name="btnImportQrCode" IsEnabled="{Binding CanImportQrCode}" Content="{loc:Localization BtnImportQrCode}" Command="{Binding ToggleQrImport}" CommandParameter="true" HorizontalAlignment="Left" Height="25" Width="150" />
     </StackPanel>
 
     <StackPanel IsVisible="{Binding ShowQrImport}" DockPanel.Dock="Top" Orientation="Vertical">
