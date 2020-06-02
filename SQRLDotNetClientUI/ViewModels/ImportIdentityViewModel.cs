@@ -122,11 +122,20 @@ namespace SQRLDotNetClientUI.ViewModels
                 Log.Error($"Error creating fake camera frame:\r\n{ex}");
                 this.CanImportQrCode = false;
 
-                _ = new MessageBoxViewModel(_loc.GetLocalizationValue("ErrorTitleGeneric"),
-                    _loc.GetLocalizationValue("MissingLibGdiPlusErrorMessage"),
-                    MessageBoxSize.Medium, MessageBoxButtons.OK, MessageBoxIcons.ERROR)
-                    .ShowDialog(this);
+                ShowLibGdiPlusErrorMsg();
             }
+        }
+
+        /// <summary>
+        /// Displays an error message telling the user that the libgdiplus 
+        /// libraray is required for some functions to work correctly.
+        /// </summary>
+        private async void ShowLibGdiPlusErrorMsg()
+        {
+            await new MessageBoxViewModel(_loc.GetLocalizationValue("ErrorTitleGeneric"),
+                _loc.GetLocalizationValue("MissingLibGdiPlusErrorMessage"),
+                MessageBoxSize.Medium, MessageBoxButtons.OK, MessageBoxIcons.ERROR)
+                .ShowDialog(this);
         }
 
         /// <summary>
